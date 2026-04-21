@@ -3,6 +3,14 @@ use std::{
     thread,
 };
 
+pub struct PoolCreationError;
+
+impl std::fmt::Debug for PoolCreationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "PoolCreationError: size must be greater than 0")
+    }
+}
+
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: mpsc::Sender<Job>,
@@ -32,6 +40,23 @@ impl ThreadPool {
 
         ThreadPool { workers, sender }
     }
+
+    pub fn build(size: usize) -> Result<ThreadPool, PoolCreationError> {
+        if size == 0 {
+            return Err(PoolCreationError);
+        }
+
+        let (sender, receiver) = mpsc::channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+        let mut workers = Vec::with_capacity(size);
+
+        for id in 0..size {
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
+        }
+
+        Ok(ThreadPool { workers, sender })
+    }
+
 
     pub fn execute<F>(&self, f: F)
     where
